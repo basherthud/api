@@ -29,7 +29,6 @@ ma = Marshmallow(app)
 order_product = Table(
     "order_product",
     Base.metadata,
-    Column("user_id", ForeignKey("user_account.id"), primary_key=True),
     Column("order_id", ForeignKey("orders.id"), primary_key=True),
     Column("product_id", ForeignKey("products.id"), primary_key=True)
 
@@ -75,16 +74,15 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
         
     # Order Schema
 class OrderSchema(ma.SQLAlchemyAutoSchema):
-    #  user_id = fields.Int(required=False)
-    #  order_date = fields.String(required=False)
      class Meta:
-        # fields = ("id",DateTime)
         model = Order
+        include_fk=True
 
     # Product Schema
 class ProductSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Product
+        
        
        
 # Initialize Schemas
@@ -237,19 +235,18 @@ def add_product_to_order(order_id, product_id):
     order = db.session.get(Order, order_id)
     product = db.session.get(Product, product_id)
     
-    if not order not in product:
+    if not order:
         return jsonify({"message": "Order not found"}), 404
 
     if product in order.products:
         return jsonify({"message": "Product already in order"}), 400
     
-    new_product = Product['product_id'].append(order_id)
-    db.session.add(new_product)
+    order.products.append(product)
     db.session.commit()
     return product_schema.jsonify({"message": f"Product {product.id} added to your order {order_id}"}), 200
     
 #DELETE PRODUCT FROM ORDER
-@app.route('/orders/<int:order_id>/remove_product', methods=['DELETE'])
+@app.route('/orders/<int:order_id>/remove_product/<int:product_id>', methods=['DELETE'])
 def remove_product_from_order(order_id,product_id):
     product = db.session.get(Product, product_id)
     order = db.session.get(Order,order_id)
@@ -264,20 +261,22 @@ def remove_product_from_order(order_id,product_id):
 #GET ALL ORDERS FOR USER
 @app.route('/orders/user/<int:user_id>', methods=['GET'])
 def get_orders_for_user(user_id):
-    orders = db.session.get(User,user_id)
+    user = db.session.get(User,user_id)
 
-    if not orders:
-        return jsonify({'message''Not Found'}),404
+    if not user:
+        return jsonify({"message":"Not Found"}),404
     
-    return orders_schema.jsonify(orders), 200
+    return orders_schema.jsonify(user.orders), 200
 
 # GETTING ALL PRODUCTS FOR ORDER
 @app.route('/orders/<int:order_id>/products', methods=['GET'])
-def get_products_for_order(order_id,product_id):
-    query = select(Product,product_id, Order,order_id)
-    products = db.session.execute(query).scalars().all()
-
-    return products_schema.jsonify({"message": f"Products for order {products}"}), 200
+def get_products_for_order(order_id):
+    orders = db.session.get(Order,order_id)
+    
+    if not orders: 
+        return jsonify({"message": "Not Found"}), 404
+    
+    return products_schema.jsonify(orders.products), 200
 
 if __name__ == '__main__':
 
